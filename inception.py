@@ -39,7 +39,7 @@ VALIDATION_PERCENTAGE = 10
 TEST_PERCENTAGE = 10
 
 # 定义神经网络的设置
-LEARNING_RATE = 0.1
+LEARNING_RATE = 0.01
 STEPS = 4000
 BATCH = 100
 
@@ -154,17 +154,17 @@ def get_or_create_bottleneck(sess, image_lists, label_name, index, category, jpe
 
 
 # 这个函数随机获取一个batch的图片作为训练数据
-def get_random_cached_bottlenecks(sess, n_classes, image_lists, how_many, category, jpeg_data_tensor,
+def get_random_cached_bottlenecks(sess, n_class, image_lists, how_many, category, jpeg_data_tensor,
                                   bottleneck_tensor):
     bottlenecks = []
     ground_truths = []
     for _ in range(how_many):
-        label_index = random.randrange(n_classes)
+        label_index = random.randrange(n_class)
         label_name = list(image_lists.keys())[label_index]
         image_index = random.randrange(65536)
         bottleneck = get_or_create_bottleneck(sess, image_lists, label_name, label_index, category, jpeg_data_tensor,
                                               bottleneck_tensor)
-        ground_truth = np.zeros(n_classes, dtype=np.float32)
+        ground_truth = np.zeros(n_class, dtype=np.float32)
         ground_truth[label_index] = 1.0
         bottlenecks.append(bottleneck)
         ground_truths.append(ground_truth)
@@ -173,7 +173,7 @@ def get_random_cached_bottlenecks(sess, n_classes, image_lists, how_many, catego
 
 # 这个函数获取全部的测试数据。
 # 在最终测试时需要在所有的测试数据上计算正确率
-def get_test_bootlenecks(sess, image_lists, n_classes, jpeg_data_tensor, bottleneck_tensor):
+def get_test_bootlenecks(sess, image_lists, n_class, jpeg_data_tensor, bottleneck_tensor):
     bottlenecks = []
     ground_truths = []
     label_name_list = list(image_lists.keys())
@@ -183,7 +183,7 @@ def get_test_bootlenecks(sess, image_lists, n_classes, jpeg_data_tensor, bottlen
         for index, unused_base_name in enumerate(image_lists[label_name][category]):
             bottleneck = get_or_create_bottleneck(sess, image_lists, label_name, index, category, jpeg_data_tensor,
                                                   bottleneck_tensor)
-            ground_truth = np.zeros(n_classes, dtype=np.float32)
+            ground_truth = np.zeros(n_class, dtype=np.float32)
             ground_truth[label_index] = 1.0
             bottlenecks.append(bottleneck)
             ground_truths.append(ground_truth)
@@ -216,7 +216,7 @@ def main(_):
             final_tensor = tf.nn.softmax(logits)
 
         # 定义交叉熵损失函数
-        cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=ground_truth_input)
+        cross_entropy = tf.nn.softmax_cross_entropy_with_logits(labels=ground_truth_input, logits=logits)
         cross_entropy_mean = tf.reduce_mean(cross_entropy)
         train_step = tf.train.GradientDescentOptimizer(LEARNING_RATE).minimize(cross_entropy_mean)
 
@@ -250,14 +250,15 @@ def main(_):
                     print('Step %d: Validation accuracy on random asmpled %d '
                           'examples = %.1f%%' % (i, BATCH, validation_accuracy * 100))
 
-                # 在最后的测试数据上测试正确率
-                test_bootlenecks, test_ground_truth = get_test_bootlenecks(
-                    sess, image_lists, n_class, jpeg_data_tensor, bottleneck_tensor)
-                test_accuracy = sess.run(
-                    evaluation_step, feed_dict={bottleneck_input: test_bootlenecks,
-                                                ground_truth_input: test_ground_truth})
-                #%.1f%%是指明输出格式，.1就是0.1，0可以不写，表示输出只保留小数点后一位。%%是输出一个百分号，前面的%是格式符
-                print('Final test accuracy = %.1f%%' % (test_accuracy * 100))
+                if i % 1000 == 0 or i + 1 == STEPS:
+                    # 在最后的测试数据上测试正确率
+                    test_bootlenecks, test_ground_truth = get_test_bootlenecks(
+                        sess, image_lists, n_class, jpeg_data_tensor, bottleneck_tensor)
+                    test_accuracy = sess.run(
+                        evaluation_step, feed_dict={bottleneck_input: test_bootlenecks,
+                                                    ground_truth_input: test_ground_truth})
+                    #%.1f%%是指明输出格式，.1就是0.1，0可以不写，表示输出只保留小数点后一位。%%是输出一个百分号，前面的%是格式符
+                    print('Final test accuracy = %.1f%%' % (test_accuracy * 100))
 
 
 if __name__ == '__main__':
