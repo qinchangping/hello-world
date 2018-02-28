@@ -112,7 +112,7 @@ def get_image_path(image_lists, image_dir, label_name, index, category):
 
 
 # 这个函数通过类别名称、所属数据集和图片编号获取经过inception-v3模型处理之后的特征向量文件地址
-def get_bottlenect_path(image_lists, label_name, index, category):
+def get_bottleneck_path(image_lists, label_name, index, category):
     return get_image_path(image_lists, CACHE_DIR, label_name, index, category) + '.txt'
 
 
@@ -134,7 +134,7 @@ def get_or_create_bottleneck(sess, image_lists, label_name, index, category, jpe
     sub_dir = label_lists['dir']
     sub_dir_path = os.path.join(CACHE_DIR, sub_dir)
     if not os.path.exists(sub_dir_path): os.makedirs(sub_dir_path)
-    bottleneck_path = get_bottlenect_path(image_lists, label_name, index, category)
+    bottleneck_path = get_bottleneck_path(image_lists, label_name, index, category)
 
     # 如果特征向量不存在，则通过inception-v3模型来计算特征向量，并存入文件
     if not os.path.exists(bottleneck_path):
@@ -161,8 +161,8 @@ def get_random_cached_bottlenecks(sess, n_class, image_lists, how_many, category
     for _ in range(how_many):
         label_index = random.randrange(n_class)
         label_name = list(image_lists.keys())[label_index]
-        image_index = random.randrange(65536)
-        bottleneck = get_or_create_bottleneck(sess, image_lists, label_name, label_index, category, jpeg_data_tensor,
+        image_index = random.randrange(65535)
+        bottleneck = get_or_create_bottleneck(sess, image_lists, label_name, image_index, category, jpeg_data_tensor,
                                               bottleneck_tensor)
         ground_truth = np.zeros(n_class, dtype=np.float32)
         ground_truth[label_index] = 1.0
@@ -173,7 +173,7 @@ def get_random_cached_bottlenecks(sess, n_class, image_lists, how_many, category
 
 # 这个函数获取全部的测试数据。
 # 在最终测试时需要在所有的测试数据上计算正确率
-def get_test_bootlenecks(sess, image_lists, n_class, jpeg_data_tensor, bottleneck_tensor):
+def get_test_bottlenecks(sess, image_lists, n_class, jpeg_data_tensor, bottleneck_tensor):
     bottlenecks = []
     ground_truths = []
     label_name_list = list(image_lists.keys())
@@ -247,18 +247,17 @@ def main(_):
                     validation_accuracy = sess.run(
                         evaluation_step, feed_dict={bottleneck_input: validation_bottlenecks,
                                                     ground_truth_input: validation_ground_truth})
-                    print('Step %d: Validation accuracy on random asmpled %d '
+                    print('Step %d: Validation accuracy on random sampled %d '
                           'examples = %.1f%%' % (i, BATCH, validation_accuracy * 100))
 
-                if i % 1000 == 0 or i + 1 == STEPS:
-                    # 在最后的测试数据上测试正确率
-                    test_bootlenecks, test_ground_truth = get_test_bootlenecks(
-                        sess, image_lists, n_class, jpeg_data_tensor, bottleneck_tensor)
-                    test_accuracy = sess.run(
-                        evaluation_step, feed_dict={bottleneck_input: test_bootlenecks,
-                                                    ground_truth_input: test_ground_truth})
-                    #%.1f%%是指明输出格式，.1就是0.1，0可以不写，表示输出只保留小数点后一位。%%是输出一个百分号，前面的%是格式符
-                    print('Final test accuracy = %.1f%%' % (test_accuracy * 100))
+            # 在最后的测试数据上测试正确率
+            test_bottlenecks, test_ground_truth = get_test_bottlenecks(
+                sess, image_lists, n_class, jpeg_data_tensor, bottleneck_tensor)
+            test_accuracy = sess.run(
+                evaluation_step, feed_dict={bottleneck_input: test_bottlenecks,
+                                            ground_truth_input: test_ground_truth})
+            #%.1f%%是指明输出格式，.1就是0.1，0可以不写，表示输出只保留小数点后一位。%%是输出一个百分号，前面的%是格式符
+            print('Final test accuracy = %.1f%%' % (test_accuracy * 100))
 
 
 if __name__ == '__main__':
